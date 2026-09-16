@@ -36,6 +36,16 @@ export class TokenValidator {
         throw new Error('Invalid token type');
       }
 
+      // Validar issuer explícitamente
+      if (tokenPayload.iss !== this.issuer) {
+        throw new Error('Invalid issuer');
+      }
+
+      // Validar audience explícitamente
+      if (tokenPayload.aud !== this.audience) {
+        throw new Error('Invalid audience');
+      }
+
       // Validar expiración con clock skew
       this.validateExpiration(tokenPayload);
 
