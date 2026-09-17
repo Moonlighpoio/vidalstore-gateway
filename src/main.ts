@@ -1,31 +1,27 @@
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
-import { corsConfig } from './config/cors.config';
 import { ConfigService } from '@nestjs/config';
-import { ValidationPipe } from '@nestjs/common';
+import { AppModule } from './app.module';
 import { AuthExceptionFilter } from './common/filters/auth-exception.filter';
 
-async function bootstrap() {
+async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
-  
-  // Enable CORS with strict configuration
-  app.enableCors(corsConfig);
-  app.useGlobalFilters(new AuthExceptionFilter());
-  
-  // Global validation pipe
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
+  const configService = app.get(ConfigService);
 
-  // Get port from environment or default to 8080
-  const port = process.env.PORT || 8080;
-  
+  app.enableCors({
+    origin: configService.get<string>(
+      'cors.origin',
+      'http://localhost:4200',
+    ),
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Authorization', 'Content-Type'],
+    credentials: true,
+  });
+
+  app.useGlobalFilters(new AuthExceptionFilter());
+
+  const port = configService.get<number>('port', 8080);
+
   await app.listen(port);
-  console.log(`Gateway running on http://localhost:${port}`);
 }
 
 bootstrap();

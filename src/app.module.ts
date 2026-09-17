@@ -1,17 +1,16 @@
-import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import configuration from './config/configuration';
 import { RoutesModule } from './routes/routes.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      load: [configuration],
+      cache: true,
     }),
     RoutesModule,
   ],
 })
-export class AppModule implements NestModule {
-  configure(consumer: MiddlewareConsumer) {
-    // No global middleware needed - using guards instead
-  }
-}
+export class AppModule {}
