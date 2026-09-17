@@ -27,7 +27,6 @@ export class TokenValidator {
   async validate(token: string): Promise<TokenPayload> {
     const { payload } = await this.keyResolver.verify(token, {
       issuer: this.issuer,
-      audience: this.audience,
       algorithms: ['RS256'],
     });
 
@@ -37,6 +36,23 @@ export class TokenValidator {
       throw new Error('Invalid token type');
     }
 
+    this.validateClientId(tokenPayload);
+
     return tokenPayload;
+  }
+
+  private validateClientId(payload: TokenPayload): void {
+    const clientId = payload.client_id;
+    const audience = payload.aud;
+
+    const audienceMatches =
+      typeof audience === 'string'
+        ? audience === this.audience
+        : Array.isArray(audience) &&
+          audience.includes(this.audience);
+
+    if (clientId !== this.audience && !audienceMatches) {
+      throw new Error('Invalid client ID');
+    }
   }
 }
