@@ -1,124 +1,173 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# VidalStore Gateway
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+VidalStore Gateway is a NestJS API gateway that validates AWS Cognito JWT access tokens and proxies authorized requests to the VidalStore BFF.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Architecture
 
-## Description
-
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
-
-```bash
-$ npm install
+```text
+Angular Frontend
+       |
+       | Authorization: Bearer <access-token>
+       v
+VidalStore Gateway (NestJS, port 8080)
+       |
+       | JWT validation through AWS Cognito JWKS
+       | Forwarded Authorization header
+       v
+VidalStore BFF (port 8081)
 ```
 
-## Compile and run the project
+## Features
+
+- Validates JWT access tokens issued by AWS Cognito
+- Retrieves public signing keys from the Cognito JWKS endpoint
+- Validates token issuer, audience, token use, expiration, and issued-at time
+- Allows clock skew tolerance during token validation
+- Protects routes with a NestJS authentication guard
+- Configures CORS for the frontend origin
+- Proxies requests to the VidalStore BFF
+- Forwards the original `Authorization` header to the BFF
+
+## Requirements
+
+- Node.js 18 or newer
+- npm
+- AWS Cognito User Pool configuration
+- VidalStore BFF running locally or reachable through `BFF_URL`
+
+## Installation
+
+Install the project dependencies:
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+npm install
 ```
 
-## Run tests
+## Environment Configuration
+
+Create a `.env` file from the example file:
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+cp .env.example .env
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+Configure the following environment variables:
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+# Server
+PORT=8080
+
+# CORS
+CORS_ORIGIN=http://localhost:4200
+
+# BFF
+BFF_URL=http://localhost:8081
+
+# AWS Cognito
+COGNITO_USER_POOL_ID=us-east-1_XXXXXXXXX
+COGNITO_APP_CLIENT_ID=XXXXXXXXXXXXXXXXXXXXXXXXXX
+COGNITO_REGION=us-east-1
+COGNITO_ISSUER=[https://cognito-idp.us-east-1.amazonaws.com/us-east-1_XXXXXXXXX](https://cognito-idp.us-east-1.amazonaws.com/us-east-1_XXXXXXXXX)
+COGNITO_AUDIENCE=XXXXXXXXXXXXXXXXXXXXXXXXXX
+COGNITO_JWKS_URI=[https://cognito-idp.us-east-1.amazonaws.com/us-east-1_XXXXXXXXX/.well-known/jwks.json](https://cognito-idp.us-east-1.amazonaws.com/us-east-1_XXXXXXXXX/.well-known/jwks.json)
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+Replace the placeholder values with your real AWS Cognito User Pool values.
 
-## Observability
+## Running the Application
 
-In production applications, observability is essential for understanding how your system behaves, detecting issues early, and maintaining reliable performance.
-
-[NestJS Observe](https://observe.nestjs.com) automatically instruments your NestJS application, giving you deep visibility into your system with minimal setup:
-
-- **Distributed tracing:** Follow requests across services and understand how they flow through your system.
-- **Waterfall analysis:** Visualize request execution and identify slow operations, bottlenecks, and unexpected delays.
-- **Performance analysis:** Analyze application performance in real time and quickly pinpoint areas that need optimization.
-- **Metrics:** Track key application and infrastructure metrics to understand system health and performance trends.
-- **Logging:** Centralize and correlate logs with traces and other telemetry to make debugging easier.
-- **Error tracking:** Detect errors quickly and investigate their root causes with the surrounding context.
-- **SLA monitoring:** Track service-level objectives and identify when your application is approaching or exceeding defined thresholds.
-- **Alarms and alerts:** Set up alerts for critical errors, performance degradation, SLA violations, and other anomalies so your team can react quickly.
-
-To add it to this project:
+### Development mode
 
 ```bash
-$ npm install @nestjs/observe
+npm run start:dev
 ```
 
-Then follow the [setup guide](https://docs.nestjs.com/observability/overview) - it takes a single import and an app key.
+### Build
 
-The free plan needs no payment details and covers 300,000 events a month. You can also browse the [live demo](https://www.observe-demo.nestjs.com/dashboard) first - the whole dashboard over a busy service's data, with nothing to install.
+```bash
+npm run build
+```
 
-## Resources
+### Production mode
 
-Check out a few resources that may come in handy when working with NestJS:
+```bash
+npm run start:prod
+```
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Auto-instrument your application with [NestJS Observe](https://observe.nestjs.com). Distributed tracing, metrics, and logging made easy. Error tracking and performance monitoring for your NestJS applications.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+The gateway runs by default at:
 
-## Support
+```text
+http://localhost:8080
+```
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+## Authentication
 
-## Stay in touch
+Protected endpoints require an AWS Cognito access token in the `Authorization` request header:
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+```http
+Authorization: Bearer <access-token>
+```
+
+The gateway rejects requests when the token is missing, malformed, expired, signed with an unknown key, issued by an unexpected issuer, intended for a different audience, or not an access token.
+
+## API Routes
+
+| Method | Gateway route | BFF route | Description |
+|---|---|---|---|
+| `GET` | `/v1/catalogo` | `/v1/catalogo` | Returns the game catalog |
+| `GET` | `/v1/biblioteca` | `/v1/biblioteca` | Returns the authenticated user's library |
+| `POST` | `/v1/compras` | `/v1/compras` | Creates a purchase |
+| `GET` | `/v1/licencias` | `/v1/licencias` | Returns licenses |
+| `DELETE` | `/v1/licencias/:licenciaId` | `/v1/licencias/:licenciaId` | Revokes a license |
+
+Authorization and role-specific access decisions for administrative operations are enforced by the BFF.
+
+## Security Checks
+
+### Request without a token
+
+```bash
+curl -i http://localhost:8080/v1/catalogo
+```
+
+Expected result:
+
+```text
+HTTP/1.1 401 Unauthorized
+```
+
+### Request with an invalid token
+
+```bash
+curl -i \
+  -H "Authorization: Bearer invalid.token.here" \
+  http://localhost:8080/v1/catalogo
+```
+
+Expected result:
+
+```text
+HTTP/1.1 401 Unauthorized
+```
+
+### Request with a valid access token
+
+```bash
+curl -i \
+  -H "Authorization: Bearer <access-token>" \
+  http://localhost:8080/v1/catalogo
+```
+
+Expected result: the gateway validates the token and forwards the request to the BFF.
+
+## Technology Stack
+
+- NestJS
+- TypeScript
+- `jose` for JWT and JWKS validation
+- Axios for BFF HTTP proxy requests
+- AWS Cognito for authentication
 
 ## License
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+Private project — VidalStore.
