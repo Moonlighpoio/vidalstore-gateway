@@ -57,12 +57,14 @@ export class TokenValidator {
 
   private validateExpiration(payload: TokenPayload): void {
     const now = Math.floor(Date.now() / 1000);
-    const clockSkew = 60;
+    const clockSkew = 60; // 60 segundos de tolerancia
 
+    // Validar expiración
     if (payload.exp && now > payload.exp + clockSkew) {
       throw new Error('Token expired');
     }
 
+    // Validar que no sea futuro (iat)
     if (payload.iat && now < payload.iat - clockSkew) {
       throw new Error('Token not yet valid');
     }
