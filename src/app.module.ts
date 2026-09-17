@@ -1,18 +1,17 @@
-import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { AuthMiddleware } from './auth/auth.middleware';
+import { RoutesModule } from './routes/routes.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    RoutesModule,
   ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer
-      .apply(AuthMiddleware)
-      .forRoutes('*'); // Todas las rutas requieren autenticación
+    // No global middleware needed - using guards instead
   }
 }

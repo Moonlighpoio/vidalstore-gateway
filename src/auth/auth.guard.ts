@@ -1,10 +1,9 @@
-import { Injectable, NestMiddleware, UnauthorizedException } from '@nestjs/common';
-import { Request, Response, NextFunction } from 'express';
+import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { TokenValidator } from './token.validator';
 import { ConfigService } from '@nestjs/config';
 
 @Injectable()
-export class AuthMiddleware implements NestMiddleware {
+export class AuthGuard implements CanActivate {
   private tokenValidator: TokenValidator;
 
   constructor(private configService: ConfigService) {
@@ -19,8 +18,9 @@ export class AuthMiddleware implements NestMiddleware {
     this.tokenValidator = new TokenValidator(issuer, audience, jwksUri);
   }
 
-  async use(req: Request, res: Response, next: NextFunction): Promise<void> {
-    const authHeader = req.headers.authorization;
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const request = context.switchToHttp().getRequest();
+    const authHeader = request.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       throw new UnauthorizedException('Missing or invalid authorization header');
@@ -30,8 +30,8 @@ export class AuthMiddleware implements NestMiddleware {
 
     try {
       const payload = await this.tokenValidator.validate(token);
-      (req as any).user = payload;
-      next();
+      request.user = payload;
+      return true;
     } catch (error) {
       throw new UnauthorizedException('Invalid token');
     }
