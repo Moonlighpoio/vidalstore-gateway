@@ -1,8 +1,5 @@
-import {
-  createRemoteJWKSet,
-  jwtVerify,
-  JWTPayload,
-} from 'jose';
+import { JWTPayload } from 'jose';
+import { JwksKeyResolver } from './jwks-key-resolver';
 
 export interface TokenPayload extends JWTPayload {
   sub: string;
@@ -17,20 +14,18 @@ export interface TokenPayload extends JWTPayload {
 }
 
 export class TokenValidator {
-  private readonly jwks: ReturnType<
-    typeof createRemoteJWKSet
-  >;
+  private readonly keyResolver: JwksKeyResolver;
 
   constructor(
     private readonly issuer: string,
     private readonly audience: string,
     jwksUri: string,
   ) {
-    this.jwks = createRemoteJWKSet(new URL(jwksUri));
+    this.keyResolver = new JwksKeyResolver(jwksUri);
   }
 
   async validate(token: string): Promise<TokenPayload> {
-    const { payload } = await jwtVerify(token, this.jwks, {
+    const { payload } = await this.keyResolver.verify(token, {
       issuer: this.issuer,
       audience: this.audience,
       algorithms: ['RS256'],
