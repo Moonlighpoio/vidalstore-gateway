@@ -13,7 +13,6 @@ import type { Request, Response } from 'express';
 import axios from 'axios';
 import { AuthGuard } from '../../auth/auth.guard';
 
-
 interface AuthenticatedRequest extends Request {
   user?: {
     sub?: string;
@@ -24,13 +23,11 @@ interface AuthenticatedRequest extends Request {
   };
 }
 
-
 @Controller('v1/catalogo')
 @UseGuards(AuthGuard)
 export class CatalogoRoutes {
   private readonly bffUrl =
     process.env.BFF_URL ?? 'http://localhost:3000';
-
 
   @Get()
   async getCatalogo(
@@ -39,10 +36,6 @@ export class CatalogoRoutes {
   ): Promise<void> {
     try {
       const headers = this.forwardHeaders(req);
-      
-      console.log('📡 Headers enviados al BFF:', JSON.stringify(headers, null, 2));
-      console.log('📡 BFF URL:', this.bffUrl);
-
 
       const response = await axios.get(
         `${this.bffUrl}/v1/catalogo`,
@@ -51,14 +44,11 @@ export class CatalogoRoutes {
         },
       );
 
-
       res.status(response.status).json(response.data);
     } catch (error: unknown) {
-      console.error('❌ Error al contactar BFF:', error instanceof Error ? error.message : error);
       this.handleProxyError(error, res);
     }
   }
-
 
   @Post()
   async createCatalogoItem(
@@ -75,13 +65,11 @@ export class CatalogoRoutes {
         },
       );
 
-
       res.status(response.status).json(response.data);
     } catch (error: unknown) {
       this.handleProxyError(error, res);
     }
   }
-
 
   @Put(':id')
   async updateCatalogoItem(
@@ -99,13 +87,11 @@ export class CatalogoRoutes {
         },
       );
 
-
       res.status(response.status).json(response.data);
     } catch (error: unknown) {
       this.handleProxyError(error, res);
     }
   }
-
 
   private forwardHeaders(
     req: AuthenticatedRequest,
@@ -114,37 +100,28 @@ export class CatalogoRoutes {
       'Content-Type': 'application/json',
     };
 
-
     const authorization = req.headers.authorization;
-
 
     if (authorization) {
       headers.Authorization = authorization;
     }
 
-
     const subject = req.user?.sub;
-
 
     if (!subject) {
       throw new Error('Authenticated subject is required');
     }
 
-
     headers['x-user-sub'] = subject;
 
-
     const groups = req.user?.['cognito:groups'];
-
 
     if (Array.isArray(groups)) {
       headers['x-user-groups'] = groups.join(',');
     }
 
-
     return headers;
   }
-
 
   private handleProxyError(
     error: unknown,
@@ -156,7 +133,6 @@ export class CatalogoRoutes {
         .json(error.response.data);
       return;
     }
-
 
     res.status(502).json({
       statusCode: 502,
