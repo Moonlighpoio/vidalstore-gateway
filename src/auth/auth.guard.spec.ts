@@ -62,12 +62,14 @@ describe('AuthGuard', () => {
     };
 
     // Mock del TokenValidator
-    const validateSpy = jest.spyOn(guard as any, 'tokenValidator').mockResolvedValue({
-      sub: 'user-123',
-      iss: 'https://cognito-idp.us-east-1.amazonaws.com/us-east-1_XXX',
-      aud: 'test-client-id',
-      token_use: 'access',
-    });
+    const validateSpy = jest
+      .spyOn((guard as any).tokenValidator, 'validate')
+      .mockResolvedValue({
+        sub: 'user-123',
+        iss: 'https://cognito-idp.us-east-1.amazonaws.com/us-east-1_XXX',
+        aud: 'test-client-id',
+        token_use: 'access',
+      });
 
     const result = await guard.canActivate(mockExecutionContext as ExecutionContext);
 

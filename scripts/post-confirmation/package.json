@@ -1,0 +1,9 @@
+{
+  "name": "vidalstore-post-confirmation",
+  "version": "1.0.0",
+  "description": "Trigger PostConfirmation de Cognito que agrega al grupo jugadores",
+  "main": "index.js",
+  "dependencies": {
+    "@aws-sdk/client-cognito-identity-provider": "^3.600.0"
+  }
+}

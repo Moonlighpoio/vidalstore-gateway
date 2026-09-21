@@ -193,6 +193,37 @@ curl -i \
   http://localhost:8080/v1/licencias/license-id
 ```
 
+### Auditoría
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/v1/auditoria` | Returns the revocations audit log (admin only). |
+
+Example:
+
+```bash
+curl -i \
+  -H "Authorization: Bearer <admin-access-token>" \
+  http://localhost:8080/v1/auditoria
+```
+
+## Recreación del user pool con AWS CLI
+
+Para clonar el proyecto desde cero, `scripts/setup-cognito.sh` recrea con la AWS CLI
+todo el user pool de Cognito: user pool, dominio, resource server con los scopes
+`catalogo.leer`, `catalogo.escribir` y `biblioteca.leer`, el app client principal
+(Authorization Code + PKCE), el segundo app client de prueba ("otra aplicación"),
+los grupos `jugadores`, `editores` y `administradores`, los usuarios de prueba en
+sus grupos, y la configuración del trigger PostConfirmation.
+
+```bash
+cd scripts
+REGION=us-east-1 ./setup-cognito.sh
+```
+
+El trigger PostConfirmation (`scripts/post-confirmation`) agrega automáticamente a
+cada usuario recién registrado al grupo `jugadores`, sin intervención manual.
+
 ## Authentication
 
 The gateway expects JWT access tokens issued by the configured Cognito user pool.
@@ -342,6 +373,8 @@ src/
 │   │   └── health.routes.ts
 │   ├── licencias/
 │   │   └── licencias.routes.ts
+│   ├── auditoria/
+│   │   └── auditoria.routes.ts
 │   └── routes.module.ts
 ├── app.module.ts
 └── main.ts
