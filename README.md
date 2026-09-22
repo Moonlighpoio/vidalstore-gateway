@@ -1,337 +1,192 @@
-# VidalStore Gateway
+# VidalStore — API Gateway
 
-API Gateway for the VidalStore platform. It validates JWT access tokens issued by AWS Cognito and proxies requests to the BFF.
+API Gateway de la plataforma **VidalStore**. Es la única puerta de entrada entre el frontend Angular y los servicios backend: valida criptográficamente los JWT emitidos por **AWS Cognito** (firma contra el JWKS), aplica CORS y enruta las peticiones autenticadas hacia el **BFF**, reenviando los datos del usuario en headers.
 
-## Architecture
+VidalStore vende **licencias de uso de videojuegos digitales**: el usuario se autentica, navega el catálogo, compra y obtiene licencias en su biblioteca.
+
+## Arquitectura
 
 ```text
-┌─────────────────┐     ┌──────────────────┐     ┌─────────┐
-│     Angular     │ ──> │   API Gateway    │ ──> │   BFF   │
-│   (frontend)    │     │   (NestJS:8080)  │     │ (:8081) │
-└─────────────────┘     └──────────────────┘     └─────────┘
-                               │
-                               ▼
-                        ┌──────────────┐
-                        │ AWS Cognito  │
-                        │    (JWKS)    │
-                        └──────────────┘
+Navegador (Angular)  :4200
+      │  Authorization: Bearer <access token>
+      ▼
+API Gateway (NestJS) :8080   ← este repositorio (valida el JWT contra el JWKS)
+      │  Authorization + x-user-sub + x-user-groups
+      ▼
+BFF (NestJS)         :3000   ← autoriza por grupo de Cognito
+      │
+      ▼
+Catálogo :8001 ──────┘
+Biblioteca :3003 ────────┘
 ```
 
-## Features
+El navegador solo conoce la URL del Gateway. Nunca llama directamente al BFF ni a los microservicios.
 
-- JWT access-token validation with AWS Cognito.
-- Signature verification using Cognito JWKS.
-- Issuer, audience, client ID, token type and expiration validation.
-- Configurable clock-skew tolerance.
-- Protected routes using a NestJS authentication guard.
-- CORS configuration for the frontend.
-- Proxy communication between the frontend and the BFF.
-- Structured authentication logging.
-- Health-check endpoint.
-- Security test examples with `curl`.
+## Funcionalidad
 
-## Prerequisites
+- Validación de JWT de acceso **access token** de AWS Cognito.
+- Verificación de firma mediante el **JWKS** del user pool (biblioteca `jose`).
+- Validación de issuer, audience/`client_id`, `token_use`, expiración y clock-skew.
+- Rutas protegidas con un guard de autenticación global sobre `/v1/*`.
+- Configuración de **CORS** para el origen del frontend.
+- Proxy hacia el BFF reenviando `x-user-sub` y `x-user-groups`.
+- Logging estructurado de autenticación.
+- Endpoint de health check público.
+- Script AWS CLI para recrear el user pool de Cognito completo.
 
-- Node.js 18 or later.
-- npm or yarn.
-- An AWS Cognito user pool.
-- A configured Cognito app client.
-- A running VidalStore BFF service.
+## Tecnologías
 
-## Installation
+- NestJS + TypeScript.
+- `jose` para verificación de JWT/JWKS.
+- Axios para el proxy hacia el BFF.
+- `@nestjs/config` para configuración.
+- Jest (pruebas) y Oxlint (linting).
+- AWS Cognito (user pool, app clients y grupos).
+- Pruebas de seguridad con `curl`.
 
-Clone the repository and install the dependencies:
+## Requisitos
+
+- Node.js 18 o superior.
+- npm.
+- Un user pool y app client de AWS Cognito configurados.
+- El servicio **BFF** de VidalStore corriendo.
+
+## Instalación
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/wsk4/vidalstore-gateway.git
 cd vidalstore-gateway
 npm install
 ```
 
-Create the local environment file:
+Crea el archivo de entorno local:
 
 ```bash
 cp .env.example .env
 ```
 
-Then update `.env` with your actual Cognito and BFF configuration.
+## Variables de entorno
 
-## Environment Variables
+| Variable | Descripción | Valor por defecto |
+|---|---|---|
+| `PORT` | Puerto del Gateway. | `8080` |
+| `NODE_ENV` | Entorno de ejecución. | `development` |
+| `COGNITO_USER_POOL_ID` | ID del user pool de Cognito. | — |
+| `COGNITO_APP_CLIENT_ID` | ID del app client. | — |
+| `COGNITO_REGION` | Región del user pool. | `us-east-1` |
+| `COGNITO_ISSUER` | Issuer (`https://cognito-idp.amazonaws.com/<pool>`). | — |
+| `COGNITO_AUDIENCE` | Audience/cliente esperado en el token. | — |
+| `COGNITO_JWKS_URI` | URI del `/.well-known/jwks.json`. | — |
+| `CORS_ORIGIN` | Origen permitido para el frontend. | `http://localhost:4200` |
+| `BFF_URL` | URL base del BFF. | `http://localhost:3000` |
 
-Example `.env` configuration:
+Nunca se versiona un `.env` con valores reales ni credenciales de AWS.
 
-```env
-# Server
-PORT=8080
-NODE_ENV=development
-
-# AWS Cognito
-COGNITO_USER_POOL_ID=us-east-1_XXXXXXXXX
-COGNITO_APP_CLIENT_ID=XXXXXXXXXXXXXXXXXXXXXXXXXX
-COGNITO_REGION=us-east-1
-COGNITO_ISSUER=[https://cognito-idp.us-east-1.amazonaws.com/us-east-1_XXXXXXXXX](https://cognito-idp.us-east-1.amazonaws.com/us-east-1_XXXXXXXXX)
-COGNITO_AUDIENCE=XXXXXXXXXXXXXXXXXXXXXXXXXX
-COGNITO_JWKS_URI=[https://cognito-idp.us-east-1.amazonaws.com/us-east-1_XXXXXXXXX/.well-known/jwks.json](https://cognito-idp.us-east-1.amazonaws.com/us-east-1_XXXXXXXXX/.well-known/jwks.json)
-
-# CORS
-CORS_ORIGIN=http://localhost:4200
-
-# BFF
-BFF_URL=http://localhost:8081
-```
-
-### Variable Description
-
-| Variable | Description |
-|---|---|
-| `PORT` | Port used by the gateway. |
-| `NODE_ENV` | Application environment. |
-| `COGNITO_USER_POOL_ID` | AWS Cognito user pool identifier. |
-| `COGNITO_APP_CLIENT_ID` | Cognito app client identifier. |
-| `COGNITO_REGION` | AWS region where Cognito is deployed. |
-| `COGNITO_ISSUER` | Cognito issuer URL. |
-| `COGNITO_AUDIENCE` | Expected token audience when applicable. |
-| `COGNITO_JWKS_URI` | URL used to retrieve Cognito public signing keys. |
-| `CORS_ORIGIN` | Allowed frontend origin. |
-| `BFF_URL` | Base URL of the VidalStore BFF. |
-
-Do not commit the real `.env` file or any secret credentials to the repository.
-
-## Running the Application
-
-### Development
+## Ejecución
 
 ```bash
-npm run start:dev
+npm run start:dev    # desarrollo con watch
+npm run build        # compilación
+npm run start:prod   # producción
 ```
 
-### Standard start
+El Gateway queda disponible en `http://localhost:8080`.
 
-```bash
-npm run start
-```
+## Endpoints
 
-### Production build
+> Todas las rutas `/v1/*` requieren `Authorization: Bearer <access token>`.
 
-```bash
-npm run build
-npm run start:prod
-```
+| Método | Ruta | Descripción | Proxy al BFF |
+|---|---|---|---|
+| `GET` | `/health` | Health check (público). | — |
+| `GET` | `/v1/catalogo` | Lista el catálogo de juegos. | `GET /v1/catalogo` |
+| `POST` | `/v1/catalogo` | Crea un juego. | `POST /v1/catalogo` |
+| `PUT` | `/v1/catalogo/:id` | Actualiza un juego. | `PUT /v1/catalogo/:id` |
+| `GET` | `/v1/biblioteca` | Biblioteca del usuario autenticado. | `GET /v1/biblioteca` |
+| `POST` | `/v1/compras` | Crea una compra (licencia) para el usuario. | `POST /v1/compras` |
+| `GET` | `/v1/licencias` | Lista todas las licencias (admin). | `GET /v1/licencias` |
+| `DELETE` | `/v1/licencias/:licenciaId` | Revoca una licencia (admin). | `DELETE /v1/licencias/:id` |
+| `GET` | `/v1/auditoria` | Historial de revocaciones (admin). | `GET /v1/auditoria` |
 
-The gateway will be available at:
-
-```text
-http://localhost:8080
-```
-
-## API Endpoints
-
-Protected endpoints require a valid access token in the following header:
+### Header de autorización
 
 ```http
 Authorization: Bearer <access-token>
 ```
 
-### Health
+El Gateway resuelve el usuario desde el token y reenvía al BFF estos headers:
 
-| Method | Endpoint | Description | Authentication |
-|---|---|---|---|
-| `GET` | `/health` | Returns gateway health information. | Not required |
+```http
+Authorization: Bearer <access-token>
+x-user-sub: <sub del token>
+x-user-groups: jugadores,editores
+```
 
-Example:
+### Ejemplos con curl
 
 ```bash
+# Health (público) → 200
 curl -i http://localhost:8080/health
-```
 
-### Catalog
+# Sin token → 401
+curl -i http://localhost:8080/v1/catalogo
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/v1/catalogo` | Returns the catalog of games. |
-| `POST` | `/v1/catalogo` | Creates a new game. |
-| `PUT` | `/v1/catalogo/:juegoId` | Updates an existing game. |
+# Token inválido → 401
+curl -i -H "Authorization: Bearer mal.token.aqui" http://localhost:8080/v1/catalogo
 
-Example:
+# Esquema de autorización inválido → 401
+curl -i -H "Authorization: Basic cached.credentials" http://localhost:8080/v1/catalogo
 
-```bash
-curl -i \
-  -H "Authorization: Bearer <access-token>" \
-  http://localhost:8080/v1/catalogo
-```
+# Token válido → 200
+curl -i -H "Authorization: Bearer $ACCESS_TOKEN" http://localhost:8080/v1/catalogo
 
-### Library and Purchases
+# Jugador intentando revocar una licencia → 403 (decisión del BFF/microservicio)
+curl -i -X DELETE -H "Authorization: Bearer $PLAYER_TOKEN" \
+  http://localhost:8080/v1/licencias/lic-1
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/v1/biblioteca` | Returns the authenticated user's library. |
-| `POST` | `/v1/compras` | Creates a purchase. |
-
-Example:
-
-```bash
-curl -i \
-  -H "Authorization: Bearer <access-token>" \
+# Compra de un juego
+curl -i -X POST -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"juegoId":"game-id"}' \
+  -d '{"gameId":"ftg-1"}' \
   http://localhost:8080/v1/compras
 ```
 
-### Licenses
+## Autenticación
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/v1/licencias` | Returns licenses. |
-| `DELETE` | `/v1/licencias/:licenciaId` | Revokes a license. |
+El Gateway espera **access tokens** del user pool configurado. El flujo de validación:
 
-Example:
+1. Header `Authorization` presente.
+2. Extracción del token `Bearer`.
+3. Estructura de JWT (3 partes).
+4. **Verificación de firma** contra el JWKS de Cognito.
+5. Validación de **issuer** (`iss`).
+6. Validación de **audience/client** (`aud`/`client_id`).
+7. Validación de **tipo de token** (`token_use = access`).
+8. Validación de **expiración** (`exp`) e iat con tolerancia de clock-skew.
 
-```bash
-curl -i \
-  -H "Authorization: Bearer <admin-access-token>" \
-  -X DELETE \
-  http://localhost:8080/v1/licencias/license-id
-```
+## Recreación del user pool (AWS CLI)
 
-### Auditoría
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/v1/auditoria` | Returns the revocations audit log (admin only). |
-
-Example:
-
-```bash
-curl -i \
-  -H "Authorization: Bearer <admin-access-token>" \
-  http://localhost:8080/v1/auditoria
-```
-
-## Recreación del user pool con AWS CLI
-
-Para clonar el proyecto desde cero, `scripts/setup-cognito.sh` recrea con la AWS CLI
-todo el user pool de Cognito: user pool, dominio, resource server con los scopes
-`catalogo.leer`, `catalogo.escribir` y `biblioteca.leer`, el app client principal
-(Authorization Code + PKCE), el segundo app client de prueba ("otra aplicación"),
-los grupos `jugadores`, `editores` y `administradores`, los usuarios de prueba en
-sus grupos, y la configuración del trigger PostConfirmation.
+El script `scripts/setup-cognito.sh` recrea desde cero todo el entorno de Cognito: user pool, dominio, resource server con los scopes `catalogo.leer`, `catalogo.escribir` y `biblioteca.leer`, el app client principal (Authorization Code + PKCE), un segundo app client de prueba ("otra aplicación"), los grupos `jugadores`, `editores` y `administradores`, los usuarios de prueba en sus grupos y el trigger **PostConfirmation**.
 
 ```bash
 cd scripts
 REGION=us-east-1 ./setup-cognito.sh
 ```
 
-El trigger PostConfirmation (`scripts/post-confirmation`) agrega automáticamente a
-cada usuario recién registrado al grupo `jugadores`, sin intervención manual.
+El trigger `scripts/post-confirmation` agrega automáticamente a cada usuario recién registrado al grupo `jugadores`.
 
-## Authentication
+## Códigos de respuesta
 
-The gateway expects JWT access tokens issued by the configured Cognito user pool.
+| Código | Significado | Cuándo se usa |
+|---|---|---|
+| `200 OK` | Éxito | Peticiones válidas. |
+| `201 Created` | Recurso creado | `POST /v1/catalogo` y `POST /v1/compras`. |
+| `401 Unauthorized` | No autenticado | Token ausente, malformado o inválido. |
+| `403 Forbidden` | No autorizado | Rol insuficiente (resuelto por BFF/microservicio). |
+| `404 Not Found` | No encontrado | Recurso inexistente. |
+| `502 Bad Gateway` | BFF no disponible | Error de proxy sin respuesta. |
 
-The token validation process includes:
-
-- Authorization header validation.
-- Bearer token extraction.
-- JWT structure validation.
-- JWT signature verification using Cognito JWKS.
-- Issuer validation.
-- Audience or client ID validation.
-- `token_use` validation.
-- Expiration validation.
-- Issued-at validation with clock-skew tolerance.
-
-For Cognito access tokens, the `client_id` claim should match the configured app client. ID tokens generally use the `aud` claim for the app client identifier.
-
-## Security Tests
-
-### Test 1: Request without a token
-
-```bash
-curl -i http://localhost:8080/v1/catalogo
-```
-
-Expected response:
-
-```text
-401 Unauthorized
-```
-
-### Test 2: Request with an invalid token
-
-```bash
-curl -i \
-  -H "Authorization: Bearer invalid.token.here" \
-  http://localhost:8080/v1/catalogo
-```
-
-Expected response:
-
-```text
-401 Unauthorized
-```
-
-### Test 3: Request with an invalid authorization scheme
-
-```bash
-curl -i \
-  -H "Authorization: Basic invalid.credentials" \
-  http://localhost:8080/v1/catalogo
-```
-
-Expected response:
-
-```text
-401 Unauthorized
-```
-
-### Test 4: Request with a token from another app client
-
-```bash
-curl -i \
-  -H "Authorization: Bearer <token-from-another-app-client>" \
-  http://localhost:8080/v1/catalogo
-```
-
-Expected response:
-
-```text
-401 Unauthorized
-```
-
-The token must belong to the configured Cognito app client.
-
-### Test 5: Request with a valid token but insufficient permissions
-
-```bash
-curl -i \
-  -H "Authorization: Bearer <player-access-token>" \
-  -X DELETE \
-  http://localhost:8080/v1/licencias/some-license-id
-```
-
-Expected response:
-
-```text
-403 Forbidden
-```
-
-The gateway validates the token. Role- or permission-based authorization must be enforced by the BFF or by a dedicated authorization guard.
-
-### Test 6: Health endpoint without authentication
-
-```bash
-curl -i http://localhost:8080/health
-```
-
-Expected response:
-
-```text
-200 OK
-```
-
-## Error Responses
-
-Authentication errors use the following general structure:
+Estructura típica de error de autenticación:
 
 ```json
 {
@@ -343,107 +198,63 @@ Authentication errors use the following general structure:
 }
 ```
 
-The exact error message may vary depending on the failure type.
+## Pruebas
 
-## Project Structure
+```bash
+npm test          # pruebas unitarias
+npm run test:watch
+npm run test:cov  # con cobertura
+npm run test:e2e  # pruebas e2e
+npm run lint      # oxlint
+```
+
+Las pruebas cubren la extracción del token, el validador JWT y el guard de autenticación.
+
+## Scripts disponibles
+
+```bash
+npm run build        # compilar TypeScript
+npm run start:dev    # desarrollo con watch
+npm run start:prod   # producción
+npm test             # pruebas unitarias
+npm run test:e2e     # pruebas e2e
+npm run lint         # oxlint
+npm run format       # prettier
+```
+
+## Estructura del proyecto
 
 ```text
 src/
-├── auth/
-│   ├── auth.guard.ts
-│   ├── jwks.provider.ts
-│   ├── token.validator.ts
-│   └── utils/
-│       └── token.util.ts
-├── config/
-│   ├── config.validation.ts
-│   └── cors.config.ts
-├── filters/
-│   └── auth-exception.filter.ts
-├── guards/
-│   └── rate-limit.guard.ts
-├── logger/
-│   └── auth-logger.service.ts
+├── auth/                    # AuthGuard, TokenValidator, JWKS resolver, extractor
+├── common/
+│   └── filters/             # AuthExceptionFilter
+├── config/                  # configuration, cors.config
+├── guards/                  # rate-limit.guard
+├── logger/                  # AuthLoggerService
 ├── routes/
-│   ├── biblioteca/
-│   │   └── biblioteca.routes.ts
-│   ├── catalogo/
-│   │   └── catalogo.routes.ts
-│   ├── health/
-│   │   └── health.routes.ts
-│   ├── licencias/
-│   │   └── licencias.routes.ts
-│   ├── auditoria/
-│   │   └── auditoria.routes.ts
+│   ├── auditoria/           # GET /v1/auditoria
+│   ├── biblioteca/          # GET /v1/biblioteca, POST /v1/compras
+│   ├── catalogo/            # GET/POST /v1/catalogo, PUT /v1/catalogo/:id
+│   ├── health/              # GET /health
+│   ├── licencias/           # GET /v1/licencias, DELETE /v1/licencias/:id
 │   └── routes.module.ts
 ├── app.module.ts
 └── main.ts
+
+scripts/
+├── setup-cognito.sh         # recreación del user pool con AWS CLI
+└── post-confirmation/       # trigger Lambda PostConfirmation
 ```
 
-## Testing
+## Flujo de ramas
 
-Run the unit and integration tests with:
-
-```bash
-npm test
+```text
+main ← dev ← feature/<nombre>
 ```
 
-Run tests in watch mode:
+Crea las ramas desde `dev` y abre el Pull Request con base `dev`.
 
-```bash
-npm run test:watch
-```
+## Licencia
 
-Run tests with coverage:
-
-```bash
-npm run test:cov
-```
-
-Run the production build:
-
-```bash
-npm run build
-```
-
-## GitFlow
-
-The project follows a GitFlow-based workflow.
-
-Create a feature branch from `dev`:
-
-```bash
-git checkout dev
-git pull origin dev
-git checkout -b feature/your-feature-name
-```
-
-After making changes:
-
-```bash
-npm run build
-git add .
-git commit -m "type(scope): describe the change"
-git push -u origin feature/your-feature-name
-```
-
-Then create a pull request with:
-
-- Base branch: `dev`.
-- Compare branch: your feature branch.
-- A clear description of the changes.
-- Build and test results.
-
-## Tech Stack
-
-- NestJS.
-- TypeScript.
-- AWS Cognito.
-- `jose` for JWT and JWKS validation.
-- Axios for HTTP requests.
-- Jest for testing.
-- Docker-compatible Node.js service.
-
-## License
-
-Private - VidalStore EP1.
+Proyecto académico DUOC UC — DSY1107 Desarrollo Cloud Native I.
